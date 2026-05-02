@@ -1,0 +1,31 @@
+image: node:20-alpine
+
+stages:
+  - build
+  - deploy
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - node_modules/
+    - .next/cache/
+
+# На каждой ветке кроме main — только проверяем что сборка не сломана
+build:
+  stage: build
+  script:
+    - npm ci
+    - npm run build
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+
+# На main — деплоим на Vercel
+deploy:
+  stage: deploy
+  script:
+    - npm install -g vercel --quiet
+    - vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+    - vercel build --prod --token=$VERCEL_TOKEN
+    - vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

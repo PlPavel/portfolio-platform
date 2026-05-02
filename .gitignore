@@ -34,3 +34,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# env — никогда не коммитим секреты
+.env
+.env.local
+.env.*.local
+
+# supabase local dev
+supabase/.temp/
+
+# Claude
+.claude/
+CLAUDE.md
