@@ -67,6 +67,7 @@ export default async function EditCasePage({ params }: Props) {
       initialTitle={caseData.title}
       initialStatus={caseData.status}
       initialVisibility={caseData.visibility}
+      initialCoverImageUrl={caseData.cover_image_url ?? ''}
       initialBlocks={freshBlocks ?? []}
       username={designer.username}
     />

@@ -50,7 +50,7 @@ export default function DesignerCard({ designer }: Props) {
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-semibold group-hover:underline truncate">{designer.name}</p>
             {designer.is_available && (
-              <span className="text-xs text-green-600 font-medium shrink-0">● Открыт</span>
+              <span className="text-xs text-green-600 font-medium shrink-0">● Открыт к предложениям</span>
             )}
           </div>
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Skill } from '@/lib/types'
@@ -68,9 +69,11 @@ export default function ProfileForm({
   initialExperience,
 }: Props) {
   const router = useRouter()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   // Basic info
   const [name, setName] = useState(designer.name)
@@ -122,6 +125,29 @@ export default function ProfileForm({
 
   function removeExp(i: number) {
     setExperiences((prev) => prev.filter((_, idx) => idx !== i))
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    setError(null)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `avatars/${designer.id}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('case-images')
+        .upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('case-images').getPublicUrl(path)
+      setAvatarUrl(data.publicUrl)
+    } catch {
+      setError('Не удалось загрузить аватар. Попробуйте ещё раз.')
+    } finally {
+      setUploadingAvatar(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
   }
 
   async function handleSave() {
@@ -286,13 +312,48 @@ export default function ProfileForm({
             </div>
           </div>
 
+          {/* Avatar upload */}
           <div className="space-y-2">
-            <Label>URL аватара</Label>
-            <Input
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://..."
-            />
+            <Label>Аватар</Label>
+            <div className="flex items-center gap-4">
+              {avatarUrl ? (
+                <div className="relative w-16 h-16 rounded-full overflow-hidden border shrink-0">
+                  <Image src={avatarUrl} alt="Аватар" fill className="object-cover" />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-xl font-medium shrink-0">
+                  {name.charAt(0) || '?'}
+                </div>
+              )}
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                >
+                  {uploadingAvatar ? 'Загрузка...' : 'Загрузить фото'}
+                </Button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl('')}
+                    className="ml-2 text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    Удалить
+                  </button>
+                )}
+                <p className="text-xs text-muted-foreground">JPG, PNG, WebP — до 5 МБ</p>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border p-3">

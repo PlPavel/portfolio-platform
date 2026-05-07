@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 interface CaseRow {
   id: string
+  slug: string
   title: string
   short_description: string | null
   status: 'draft' | 'published'
@@ -38,8 +38,8 @@ export default function DashboardCases({ initialCases, username }: Props) {
     if (!confirm('Удалить кейс? Это действие нельзя отменить.')) return
     setBusy(id)
     try {
-      const supabase = createClient()
-      await supabase.from('cases').delete().eq('id', id)
+      const res = await fetch(`/api/cases/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
       setCases((prev) => prev.filter((c) => c.id !== id))
     } finally {
       setBusy(null)
@@ -50,8 +50,12 @@ export default function DashboardCases({ initialCases, username }: Props) {
     const next = c.visibility === 'public' ? 'private' : 'public'
     setBusy(c.id)
     try {
-      const supabase = createClient()
-      await supabase.from('cases').update({ visibility: next }).eq('id', c.id)
+      const res = await fetch(`/api/cases/${c.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: next }),
+      })
+      if (!res.ok) throw new Error('Update failed')
       setCases((prev) => prev.map((x) => (x.id === c.id ? { ...x, visibility: next } : x)))
     } finally {
       setBusy(null)
@@ -67,9 +71,18 @@ export default function DashboardCases({ initialCases, username }: Props) {
     const b = sorted[swapIdx]
     setBusy(id)
     try {
-      const supabase = createClient()
-      await supabase.from('cases').update({ order_index: b.order_index }).eq('id', a.id)
-      await supabase.from('cases').update({ order_index: a.order_index }).eq('id', b.id)
+      await Promise.all([
+        fetch(`/api/cases/${a.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_index: b.order_index }),
+        }),
+        fetch(`/api/cases/${b.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_index: a.order_index }),
+        }),
+      ])
       setCases((prev) =>
         prev.map((c) => {
           if (c.id === a.id) return { ...c, order_index: b.order_index }
@@ -211,7 +224,7 @@ function CaseCard({
       <div className="flex items-center gap-1 shrink-0">
         {c.status === 'published' && c.visibility === 'public' && (
           <Link
-            href={`/portfolio/${username}/cases/${c.id}`}
+            href={`/portfolio/${username}/cases/${c.slug}`}
             target="_blank"
             rel="noopener"
             className={buttonVariants({ variant: 'ghost', size: 'sm' })}

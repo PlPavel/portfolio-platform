@@ -2,9 +2,11 @@
 
 import { useState, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { cn } from '@/lib/utils'
 import type {
   BlockType,
   OverviewContent,
@@ -35,6 +37,7 @@ interface Props {
   initialTitle: string
   initialStatus: string
   initialVisibility: string
+  initialCoverImageUrl: string
   initialBlocks: RawBlock[]
   username: string
 }
@@ -100,12 +103,13 @@ export default function CaseConstructor({
   caseId,
   initialTitle,
   initialStatus,
+  initialVisibility,
+  initialCoverImageUrl,
   initialBlocks,
   username,
 }: Props) {
   const router = useRouter()
 
-  // Block ID lookup (stable ref, never causes re-renders)
   const blockIdsRef = useRef<Record<BlockType, string | null>>({
     overview: null, context: null, research: null, design: null, results: null,
   })
@@ -132,6 +136,12 @@ export default function CaseConstructor({
   const [publishErrors, setPublishErrors]   = useState<string[]>([])
   const [publishing, setPublishing]         = useState(false)
   const [status, setStatus]                 = useState(initialStatus)
+  const [visibility, setVisibility]         = useState(initialVisibility || 'public')
+  const [coverImageUrl, setCoverImageUrl]   = useState(initialCoverImageUrl ?? '')
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [coverError, setCoverError]         = useState<string | null>(null)
+
+  const coverInputRef = useRef<HTMLInputElement>(null)
 
   const filledBlocks = useMemo<Set<BlockType>>(() => {
     const s = new Set<BlockType>()
@@ -174,6 +184,46 @@ export default function CaseConstructor({
     setState((prev) => ({ ...prev, [key]: value }))
   }
 
+  async function handleManualSave() {
+    await saveFn(state)
+  }
+
+  async function handleSetVisibility(v: string) {
+    setVisibility(v)
+    const supabase = createClient()
+    await supabase.from('cases').update({ visibility: v }).eq('id', caseId)
+  }
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCoverError(null)
+    setUploadingCover(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `covers/${caseId}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('case-images')
+        .upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('case-images').getPublicUrl(path)
+      setCoverImageUrl(data.publicUrl)
+      await supabase.from('cases').update({ cover_image_url: data.publicUrl }).eq('id', caseId)
+    } catch {
+      setCoverError('Не удалось загрузить обложку. Проверьте bucket case-images в Supabase.')
+    } finally {
+      setUploadingCover(false)
+      if (coverInputRef.current) coverInputRef.current.value = ''
+    }
+  }
+
+  async function handleRemoveCover() {
+    setCoverImageUrl('')
+    const supabase = createClient()
+    await supabase.from('cases').update({ cover_image_url: null }).eq('id', caseId)
+  }
+
   function validate(): string[] {
     const errs: string[] = []
     if (!state.title.trim()) errs.push('Заголовок кейса')
@@ -196,10 +246,14 @@ export default function CaseConstructor({
       const supabase = createClient()
       await supabase
         .from('cases')
-        .update({ status: 'published', visibility: 'public' })
+        .update({ status: 'published' })
         .eq('id', caseId)
       setStatus('published')
-      router.push(`/portfolio/${username}`)
+      if (visibility === 'public') {
+        router.push(`/portfolio/${username}`)
+      } else {
+        router.refresh()
+      }
     } catch {
       setSaveStatus('error')
     } finally {
@@ -213,7 +267,7 @@ export default function CaseConstructor({
       const supabase = createClient()
       await supabase
         .from('cases')
-        .update({ status: 'draft', visibility: 'private' })
+        .update({ status: 'draft' })
         .eq('id', caseId)
       setStatus('draft')
       router.refresh()
@@ -260,7 +314,7 @@ export default function CaseConstructor({
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top bar */}
       <header className="border-b sticky top-0 z-10 bg-background">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-4">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link
             href="/dashboard"
             className={buttonVariants({ variant: 'ghost', size: 'sm' })}
@@ -270,10 +324,93 @@ export default function CaseConstructor({
           <Input
             value={state.title}
             onChange={(e) => set('title', e.target.value)}
-            className="h-8 text-sm font-medium flex-1 max-w-sm border-0 shadow-none focus-visible:ring-0 px-2"
+            className="h-8 text-sm font-medium flex-1 max-w-xs border-0 shadow-none focus-visible:ring-0 px-2"
             placeholder="Название кейса"
           />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {/* Cover image upload */}
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCoverUpload}
+              className="hidden"
+            />
+            {coverImageUrl ? (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={uploadingCover}
+                  className="flex items-center gap-1 border rounded px-2 py-1 text-xs hover:bg-muted transition-colors"
+                >
+                  <div className="relative w-5 h-5 rounded overflow-hidden">
+                    <Image src={coverImageUrl} alt="cover" fill className="object-cover" />
+                  </div>
+                  Обложка
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveCover}
+                  className="text-xs text-muted-foreground hover:text-destructive"
+                  title="Удалить обложку"
+                >
+                  ×
+                </button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={uploadingCover}
+                className="text-xs"
+              >
+                {uploadingCover ? 'Загрузка...' : '+ Обложка'}
+              </Button>
+            )}
+
+            {/* Visibility toggle */}
+            <div className="flex items-center border rounded-md overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => handleSetVisibility('public')}
+                className={cn(
+                  'px-2 py-1 transition-colors',
+                  visibility === 'public'
+                    ? 'bg-secondary font-medium'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                🌐 Публичный
+              </button>
+              <div className="w-px h-4 bg-border" />
+              <button
+                type="button"
+                onClick={() => handleSetVisibility('private')}
+                className={cn(
+                  'px-2 py-1 transition-colors',
+                  visibility === 'private'
+                    ? 'bg-secondary font-medium'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                🔒 Приватный
+              </button>
+            </div>
+
+            {/* Manual save */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualSave}
+              disabled={saveStatus === 'saving'}
+            >
+              {saveStatus === 'saving' ? 'Сохранение...' : 'Сохранить изменения'}
+            </Button>
+
+            {/* Publish / Unpublish */}
             {status === 'published' ? (
               <Button
                 variant="outline"
@@ -294,6 +431,12 @@ export default function CaseConstructor({
             )}
           </div>
         </div>
+
+        {coverError && (
+          <div className="max-w-5xl mx-auto px-4 pb-2">
+            <p className="text-xs text-destructive">{coverError}</p>
+          </div>
+        )}
 
         {publishErrors.length > 0 && (
           <div className="max-w-5xl mx-auto px-4 pb-3">

@@ -25,3 +25,12 @@ export function createClient() {
     }
   )
 }
+
+// Service role client — bypasses RLS, use only in server-side code for public data reads
+export function createServiceClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  )
+}

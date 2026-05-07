@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { createClient } from '@/lib/supabase/server'
+import DashboardNav from '@/app/(protected)/dashboard/DashboardNav'
+import SearchNav from '@/app/(protected)/search/SearchNav'
 
 export const metadata: Metadata = {
   title: 'Portfolio Platform — портфолио продуктовых дизайнеров',
@@ -62,28 +65,40 @@ const MOCK_DESIGNERS = [
   },
 ]
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.user_metadata?.role as string | undefined
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
       <header className="border-b">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="font-semibold">Portfolio Platform</span>
-          <nav className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-            >
-              Войти
-            </Link>
-            <Link
-              href="/register"
-              className={buttonVariants({ size: 'sm' })}
-            >
-              Начать бесплатно
-            </Link>
-          </nav>
-        </div>
+        {user ? (
+          role === 'recruiter' ? (
+            <SearchNav />
+          ) : (
+            <DashboardNav />
+          )
+        ) : (
+          <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+            <span className="font-semibold">Portfolio Platform</span>
+            <nav className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+              >
+                Войти
+              </Link>
+              <Link
+                href="/register"
+                className={buttonVariants({ size: 'sm' })}
+              >
+                Начать бесплатно
+              </Link>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* Hero */}

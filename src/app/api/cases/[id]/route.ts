@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 interface Props {
   params: { id: string }
@@ -23,11 +23,26 @@ export async function GET(_request: Request, { params }: Props) {
 export async function PATCH(request: Request, { params }: Props) {
   try {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Verify the case belongs to the current user
+    const { data: designer } = await supabase
+      .from('designers')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+    if (!designer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
     const body = await request.json()
-    const { data, error } = await supabase
+
+    // Use service client to bypass potential RLS issues — ownership already verified above
+    const service = createServiceClient()
+    const { data, error } = await service
       .from('cases')
       .update(body)
       .eq('id', params.id)
+      .eq('designer_id', designer.id)
       .select()
       .single()
     if (error) throw error
@@ -40,7 +55,22 @@ export async function PATCH(request: Request, { params }: Props) {
 export async function DELETE(_request: Request, { params }: Props) {
   try {
     const supabase = createClient()
-    const { error } = await supabase.from('cases').delete().eq('id', params.id)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { data: designer } = await supabase
+      .from('designers')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+    if (!designer) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const service = createServiceClient()
+    const { error } = await service
+      .from('cases')
+      .delete()
+      .eq('id', params.id)
+      .eq('designer_id', designer.id)
     if (error) throw error
     return new NextResponse(null, { status: 204 })
   } catch {

@@ -7,6 +7,7 @@ import DesignerCard from '@/components/search/DesignerCard'
 import SearchClient from './SearchClient'
 import { buttonVariants } from '@/components/ui/button'
 import Link from 'next/link'
+import SearchNav from './SearchNav'
 
 export const metadata: Metadata = { title: 'Поиск дизайнеров' }
 
@@ -78,10 +79,7 @@ export default async function SearchPage({ searchParams }: Props) {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 z-10 bg-background">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/" className="font-semibold text-sm">Portfolio Platform</Link>
-          <span className="text-sm text-muted-foreground">Поиск дизайнеров</span>
-        </div>
+        <SearchNav />
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-8 flex gap-8">

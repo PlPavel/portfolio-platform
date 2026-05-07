@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import type {
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CasePublicPage({ params }: Props) {
-  const supabase = createClient()
+  const supabase = createServiceClient()
 
   const { data: designer } = await supabase
     .from('designers')
@@ -36,15 +36,19 @@ export default async function CasePublicPage({ params }: Props) {
 
   if (!designer) notFound()
 
-  // slug stored as case id (first chars) or actual slug field
-  const { data: caseData } = await supabase
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.slug)
+
+  const query = supabase
     .from('cases')
     .select('*, case_blocks(*)')
     .eq('designer_id', designer.id)
     .eq('status', 'published')
     .eq('visibility', 'public')
-    .or(`id.eq.${params.slug},slug.eq.${params.slug}`)
-    .single()
+
+  const { data: caseData } = await (isUUID
+    ? query.eq('id', params.slug)
+    : query.eq('slug', params.slug)
+  ).single()
 
   if (!caseData) notFound()
 

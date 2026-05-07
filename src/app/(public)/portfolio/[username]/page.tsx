@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 
@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function PublicPortfolioPage({ params }: Props) {
-  const supabase = createClient()
+  const supabase = createServiceClient()
 
   const { data: designer } = await supabase
     .from('designers')
@@ -34,7 +34,7 @@ export default async function PublicPortfolioPage({ params }: Props) {
 
   const { data: cases } = await supabase
     .from('cases')
-    .select('id, title, short_description, cover_image_url, tags, order_index')
+    .select('id, slug, title, short_description, cover_image_url, tags, order_index')
     .eq('designer_id', designer.id)
     .eq('status', 'published')
     .eq('visibility', 'public')
@@ -168,7 +168,7 @@ export default async function PublicPortfolioPage({ params }: Props) {
             {cases.map((c) => (
               <Link
                 key={c.id}
-                href={`/portfolio/${params.username}/cases/${c.id}`}
+                href={`/portfolio/${params.username}/cases/${c.slug}`}
                 className="group border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
               >
                 {c.cover_image_url ? (
