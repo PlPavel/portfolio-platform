@@ -328,6 +328,15 @@ export default function CaseConstructor({
             placeholder="Название кейса"
           />
           <div className="ml-auto flex items-center gap-2 flex-wrap">
+            {/* Preview */}
+            <Link
+              href={`/dashboard/cases/${caseId}/preview`}
+              target="_blank"
+              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+            >
+              Предпросмотр
+            </Link>
+
             {/* Cover image upload */}
             <input
               ref={coverInputRef}

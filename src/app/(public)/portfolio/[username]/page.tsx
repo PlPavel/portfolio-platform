@@ -177,6 +177,7 @@ export default async function PublicPortfolioPage({ params }: Props) {
                       src={c.cover_image_url}
                       alt={c.title}
                       fill
+                      sizes="(max-width: 640px) 100vw, 50vw"
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>

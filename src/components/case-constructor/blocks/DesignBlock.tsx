@@ -100,6 +100,7 @@ export default function DesignBlock({ caseId, content, onChange }: Props) {
                 src={url}
                 alt="Case image"
                 fill
+                sizes="(max-width: 640px) 50vw, 33vw"
                 className="object-cover"
               />
               <button
